@@ -1,0 +1,53 @@
+from pathlib import Path
+from pydantic import BaseModel, Field
+from PIL import Image
+
+class ImageProcessorConfig(BaseModel):
+    target_directory: Path = Field(..., description="Directory with images")
+    max_width: int = Field(default=1200, description="Max width limit")
+    quality: int = Field(default=80, description="WebP compression quality")
+    skip_hidden: bool = Field(default=True, description="Skip system hidden files and garbage")
+
+def process_images(config: ImageProcessorConfig) -> int:
+    if not config.target_directory.exists():
+        print(f"Directory {config.target_directory} does not exist.")
+        return 0
+
+    count = 0
+    valid_exts = (".png", ".jpg", ".jpeg")
+    
+    for file_path in config.target_directory.iterdir():
+        # Skip garbage: hidden files, directories, or non-image extensions
+        if not file_path.is_file():
+            continue
+        if config.skip_hidden and file_path.name.startswith('.'):
+            print(f"Skipped hidden file: {file_path.name}")
+            continue
+        if file_path.suffix.lower() not in valid_exts:
+            print(f"Skipped non-image garbage: {file_path.name}")
+            continue
+
+        try:
+            with Image.open(file_path) as img:
+                w_percent = config.max_width / float(img.size[0])
+                h_size = int(float(img.size[1]) * float(w_percent))
+                img_resized = img.resize((config.max_width, h_size), Image.Resampling.LANCZOS)
+                
+                output_path = file_path.with_suffix(".webp")
+                img_resized.save(output_path, "WEBP", quality=config.quality)
+                print(f"Converted: {file_path.name} -> {output_path.name}")
+                count += 1
+        except Exception as e:
+            print(f"Error processing {file_path.name}: {e}")
+                
+    return count
+
+if __name__ == "__main__":
+    config = ImageProcessorConfig(target_directory=Path("./images"))
+    process_images(config)
+
+#HOW TO RUN
+# PIP INSTALL PYDANTIC PILLOW & RUN YOURFILE.PY
+
+========================================================================================================================================
+#If
